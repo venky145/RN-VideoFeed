@@ -1,0 +1,34 @@
+{
+  "name": "rn-videofeed",
+  "version": "0.1.0",
+  "description": "Native vertical full-screen video feed for React Native (Reels/TikTok style) with seamless resume.",
+  "main": "src/index.ts",
+  "types": "index.d.ts",
+  "react-native": "src/index.ts",
+  "author": "Venkatesh Mandapati",
+  "license": "MIT",
+  "homepage": "https://github.com/venky145/RN-VideoFeed#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/venky145/RN-VideoFeed.git"
+  },
+  "bugs": {
+    "url": "https://github.com/venky145/RN-VideoFeed/issues"
+  },
+  "files": [
+    "src",
+    "android",
+    "ios",
+    "index.d.ts",
+    "RNVideoFeed.podspec",
+    "react-native.config.js"
+  ],
+  "dependencies": {
+    "@babel/runtime": "^7.25.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.76.0"
+  },
+  "keywords": ["react-native", "video", "feed"]
+}

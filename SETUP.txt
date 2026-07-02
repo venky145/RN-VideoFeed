@@ -1,0 +1,24 @@
+RN-VideoFeed (standalone)
+=========================
+
+This folder is outside the Token app repo. Nothing under TokenApp/app was modified.
+
+Layout
+------
+  rn-videofeed/     Library: iOS (Swift/ObjC), Android (Kotlin), JS/TS API
+  VideoFeedSample/  React Native 0.77 sample app that depends on file:../rn-videofeed
+
+First-time run (sample)
+-----------------------
+  cd VideoFeedSample
+  npm install
+  cd ios && bundle exec pod install   # or: pod install
+  cd ..
+  npx react-native run-ios
+  # or: npx react-native run-android
+
+If `react-native init` left a CocoaPods prompt open, answer N and run `pod install` manually from VideoFeedSample/ios.
+
+Publishing the library later
+----------------------------
+  Copy or move `rn-videofeed/` to its own git repo, set a real `homepage` / `source` in RNVideoFeed.podspec, then `npm publish` (scoped name recommended).
