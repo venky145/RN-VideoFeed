@@ -1,5 +1,8 @@
 # RN-VideoFeed
 
+[![CI](https://github.com/venky145/RN-VideoFeed/actions/workflows/ci.yml/badge.svg)](https://github.com/venky145/RN-VideoFeed/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A native, vertical full-screen video feed for React Native — Reels / TikTok / Shorts style.
 Playback is powered by **AVPlayer** on iOS and **Media3 ExoPlayer** on Android, driven by a
 native `UICollectionView` / `RecyclerView` so scrolling stays smooth even with many videos.
