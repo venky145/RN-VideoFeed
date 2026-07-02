@@ -17,11 +17,14 @@
   },
   "files": [
     "src",
-    "android",
+    "android/src",
+    "android/build.gradle",
     "ios",
     "index.d.ts",
     "RNVideoFeed.podspec",
-    "react-native.config.js"
+    "react-native.config.js",
+    "README.md",
+    "LICENSE"
   ],
   "dependencies": {
     "@babel/runtime": "^7.25.0"

@@ -1,0 +1,10 @@
+# Build artifacts — never publish these
+android/build/
+android/.gradle/
+android/.cxx/
+**/*.iml
+**/local.properties
+
+# OS / editor junk
+.DS_Store
+*.log

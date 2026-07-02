@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.version      = package['version']
   s.summary      = package['description']
   s.homepage     = 'https://github.com/venky145/RN-VideoFeed'
-  s.license      = { :type => 'MIT', :file => '../LICENSE' }
+  s.license      = { :type => 'MIT', :file => 'LICENSE' }
   s.author       = package['author']
   s.source       = { :git => 'https://github.com/venky145/RN-VideoFeed.git', :tag => "v#{s.version}" }
 
