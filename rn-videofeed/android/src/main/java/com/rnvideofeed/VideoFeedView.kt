@@ -229,7 +229,7 @@ class VideoFeedView @JvmOverloads constructor(
 
         val video = videos[index]
         if (viewHolder.feedPlayer.videoId != video.id || viewHolder.feedPlayer.player == null) {
-            viewHolder.configure(video, playerPool)
+            viewHolder.configure(video, playerPool, index, videos.size)
         }
 
         currentPlayer = viewHolder.feedPlayer.player
@@ -667,7 +667,7 @@ class VideoFeedAdapter(
 
     override fun onBindViewHolder(holder: VideoFeedCell, position: Int) {
         Log.d(TAG, "Binding ViewHolder at position: $position")
-        holder.configure(videos[position], playerPool)
+        holder.configure(videos[position], playerPool, position, videos.size)
         onItemVisible(position)
     }
 

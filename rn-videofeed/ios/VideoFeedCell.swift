@@ -5,20 +5,43 @@
 //  Created by Venkatesh Mandapati on 15/05/2025.
 //
 
-import UIKit
 import SDWebImage
+import UIKit
 
 class VideoFeedCell: UICollectionViewCell {
 
   let feedPlayer = FeedPlayer()
+  weak var playerPool: VideoFeedPlayerPool?
 
   private let thumbnailImageView: UIImageView = {
     let iv = UIImageView()
     iv.contentMode = .scaleAspectFit
     iv.clipsToBounds = true
+    iv.backgroundColor = UIColor(white: 0.08, alpha: 1)
     return iv
   }()
-  
+
+  private let loadingIndicator: UIActivityIndicatorView = {
+    let spinner = UIActivityIndicatorView(style: .large)
+    spinner.color = .white
+    spinner.hidesWhenStopped = true
+    return spinner
+  }()
+
+  private let indexLabel: UILabel = {
+    let label = UILabel()
+    label.textColor = .white
+    label.font = .systemFont(ofSize: 14, weight: .semibold)
+    label.textAlignment = .left
+    label.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+    label.layer.cornerRadius = 8
+    label.clipsToBounds = true
+    label.numberOfLines = 1
+    return label
+  }()
+
+  private var isShowingLoadingOverlay = false
+
   override init(frame: CGRect) {
     super.init(frame: frame)
     contentView.backgroundColor = .black
@@ -27,12 +50,9 @@ class VideoFeedCell: UICollectionViewCell {
     thumbnailImageView.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
       thumbnailImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-      thumbnailImageView.bottomAnchor.constraint(
-        equalTo: contentView.bottomAnchor),
-      thumbnailImageView.leadingAnchor.constraint(
-        equalTo: contentView.leadingAnchor),
-      thumbnailImageView.trailingAnchor.constraint(
-        equalTo: contentView.trailingAnchor),
+      thumbnailImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+      thumbnailImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+      thumbnailImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
     ])
 
     contentView.addSubview(feedPlayer)
@@ -43,75 +63,113 @@ class VideoFeedCell: UICollectionViewCell {
       feedPlayer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
       feedPlayer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
     ])
+
+    contentView.addSubview(loadingIndicator)
+    loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      loadingIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+      loadingIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+    ])
+
+    contentView.addSubview(indexLabel)
+    indexLabel.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      indexLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+      indexLabel.bottomAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+    ])
   }
 
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
 
-  func configure(with video: VideoData) {
-    // Show and start animation while loading
+  func configure(
+    with video: VideoData,
+    playerPool: VideoFeedPlayerPool,
+    index: Int,
+    total: Int
+  ) {
+    indexLabel.text = "  \(index + 1) / \(max(total, 1)) · \(video.id)  "
+    indexLabel.isHidden = false
 
-    thumbnailImageView.sd_setImage(
-      with: URL(string: video.thumbnailUrl ?? ""),
-      placeholderImage: nil,
-      options: [],
-      completed: nil
-    )
+    let resuming = playerPool.hasPlayer(videoId: video.id, videoUrl: video.videoUrl)
+      && playerPool.getPlaybackPosition(videoId: video.id) > 0.3
 
-    feedPlayer.videoUrl = video.videoUrl as NSString
-    feedPlayer.id = video.id as NSString
-    feedPlayer.isVisible = false
-    
-    // Set callback to hide thumbnail when video actually starts playing
+    if resuming {
+      hideThumbnailImmediately()
+      stopLoading()
+    } else {
+      thumbnailImageView.isHidden = false
+      if let thumb = video.thumbnailUrl, !thumb.isEmpty, let url = URL(string: thumb) {
+        thumbnailImageView.sd_setImage(with: url, placeholderImage: nil, options: [], completed: nil)
+      } else {
+        thumbnailImageView.image = nil
+      }
+      startLoading()
+    }
+
     feedPlayer.onVideoStartedPlaying = { [weak self] in
       self?.showVideoPlaying()
     }
-
-    thumbnailImageView.isHidden = false
+    feedPlayer.bindFromPool(playerPool, id: video.id, url: video.videoUrl)
+    feedPlayer.isVisible = false
   }
 
   func showVideoPlaying() {
-    // Hide thumbnail when video is visible
     thumbnailImageView.isHidden = true
+    stopLoading()
+  }
+
+  func hideThumbnailImmediately() {
+    thumbnailImageView.isHidden = true
+    stopLoading()
+  }
+
+  func showThumbnail() {
+    thumbnailImageView.isHidden = false
+    if feedPlayer.player?.timeControlStatus != .playing {
+      startLoading()
+    }
+  }
+
+  private func startLoading() {
+    isShowingLoadingOverlay = true
+    if !loadingIndicator.isAnimating {
+      loadingIndicator.startAnimating()
+    }
+  }
+
+  private func stopLoading() {
+    isShowingLoadingOverlay = false
+    loadingIndicator.stopAnimating()
+  }
+
+  func detachForReuse(using playerPool: VideoFeedPlayerPool) {
+    if !feedPlayer.videoId.isEmpty {
+      playerPool.pause(videoId: feedPlayer.videoId)
+    }
+    feedPlayer.detachPlayer()
+    feedPlayer.isVisible = false
+    feedPlayer.onVideoStartedPlaying = nil
+
+    thumbnailImageView.sd_cancelCurrentImageLoad()
+    thumbnailImageView.image = nil
+    thumbnailImageView.isHidden = false
+    stopLoading()
+    indexLabel.text = nil
   }
 
   override func prepareForReuse() {
     super.prepareForReuse()
-
-    feedPlayer.reset()
-    feedPlayer.isVisible = false
-    feedPlayer.onVideoStartedPlaying = nil // Clear callback
-
-    thumbnailImageView.image = nil
-    thumbnailImageView.isHidden = false
-
+    if let pool = playerPool {
+      detachForReuse(using: pool)
+    } else {
+      feedPlayer.reset()
+      thumbnailImageView.sd_cancelCurrentImageLoad()
+      thumbnailImageView.image = nil
+      thumbnailImageView.isHidden = false
+      stopLoading()
+      indexLabel.text = nil
+    }
   }
-  
-  
-  // Implement delegate methods to handle taps and communicate with RN side or native controller
-//  func didTapOptions() {
-//    // Show action sheet for delete/save video here
-//  }
-//
-//  func didTapMuteToggle() {
-//    // Mute/unmute toggle logic here
-//  }
-//
-//  func didTapFlag() {
-//    // Show report bottom sheet logic here
-//  }
-//
-//  func didTapViewCount() {
-//    // Show view count bottom sheet
-//  }
-//
-//  func didTapTradingVolume() {
-//    // Show trading volume bottom sheet
-//  }
-//
-//  func didTapShare() {
-//    // Trigger share logic
-//  }
-
 }

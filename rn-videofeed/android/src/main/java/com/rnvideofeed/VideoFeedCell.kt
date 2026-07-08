@@ -1,13 +1,19 @@
 package com.rnvideofeed
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -26,6 +32,8 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
 
     val feedPlayer: FeedPlayer = FeedPlayer(context)
     private val thumbnailImageView: ImageView = ImageView(context)
+    private val loadingIndicator: ProgressBar = ProgressBar(context)
+    private val indexLabel: TextView = TextView(context)
 
     private var hideThumbnailHandler: Handler? = null
     private var hideThumbnailRunnable: Runnable? = null
@@ -33,19 +41,16 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
     init {
         container.setBackgroundColor(context.getColor(android.R.color.black))
 
-        // Setup thumbnail image view
         thumbnailImageView.apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            // FIT_CENTER to match video behavior - shows full content with letterboxing
             scaleType = ImageView.ScaleType.FIT_CENTER
             adjustViewBounds = true
-            setBackgroundColor(android.graphics.Color.BLACK)
+            setBackgroundColor(Color.parseColor("#141414"))
         }
 
-        // Setup feed player
         feedPlayer.apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -53,26 +58,59 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
             )
         }
 
-        // Add views to container (order matters - thumbnail should be on top initially)
+        val spinnerSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 48f, context.resources.displayMetrics
+        ).toInt()
+        loadingIndicator.apply {
+            layoutParams = FrameLayout.LayoutParams(spinnerSize, spinnerSize, Gravity.CENTER)
+            visibility = View.GONE
+        }
+
+        val padH = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 12f, context.resources.displayMetrics
+        ).toInt()
+        val padV = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 8f, context.resources.displayMetrics
+        ).toInt()
+        val margin = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 16f, context.resources.displayMetrics
+        ).toInt()
+        val bottomMargin = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 48f, context.resources.displayMetrics
+        ).toInt()
+        indexLabel.apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.START
+            ).apply {
+                setMargins(margin, 0, 0, bottomMargin)
+            }
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT_BOLD
+            setBackgroundColor(Color.parseColor("#8C000000"))
+            setPadding(padH, padV, padH, padV)
+        }
+
         container.addView(feedPlayer)
         container.addView(thumbnailImageView)
+        container.addView(loadingIndicator)
+        container.addView(indexLabel)
 
         hideThumbnailHandler = Handler(Looper.getMainLooper())
 
-        // Set up video start/pause callbacks
         feedPlayer.onVideoStarted = {
-            Log.d(TAG, "🎬 Video actually started - hiding thumbnail with delay")
-            // Give video a moment to start, then hide thumbnail
+            Log.d(TAG, "Video started - hiding thumbnail")
             hideThumbnailRunnable?.let { hideThumbnailHandler?.removeCallbacks(it) }
             hideThumbnailRunnable = Runnable {
-                Log.d(TAG, "🚫 Hiding thumbnail due to video start")
                 thumbnailImageView.animate()
                     .alpha(0f)
                     .setDuration(300)
                     .withEndAction {
                         thumbnailImageView.visibility = View.GONE
                         thumbnailImageView.alpha = 1f
-                        Log.d(TAG, "✅ Thumbnail hidden after video start")
+                        stopLoading()
                     }
                     .start()
             }
@@ -80,21 +118,29 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
         }
 
         feedPlayer.onVideoPaused = {
-            Log.d(TAG, "⏸️ Video paused - checking if manual pause")
             showThumbnail()
         }
     }
 
-    fun configure(video: VideoData, playerPool: VideoFeedPlayerPool) {
+    fun configure(
+        video: VideoData,
+        playerPool: VideoFeedPlayerPool,
+        index: Int = 0,
+        total: Int = 1
+    ) {
         Log.d(TAG, "Configuring cell with video: ${video.id}")
+        indexLabel.text = "${index + 1} / ${maxOf(total, 1)} · ${video.id}"
+        indexLabel.visibility = View.VISIBLE
 
         val resuming = playerPool.hasPlayer(video.id, video.videoUrl) &&
             playerPool.getPlaybackPosition(video.id) > 300L
 
         if (resuming) {
             hideThumbnailImmediately()
+            stopLoading()
         } else {
             thumbnailImageView.visibility = View.VISIBLE
+            startLoading()
         }
 
         if (!video.thumbnailUrl.isNullOrEmpty()) {
@@ -103,11 +149,9 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .fitCenter()
                 .into(thumbnailImageView)
-            Log.d(TAG, "🖼️ Loading thumbnail: ${video.thumbnailUrl}")
         } else {
             thumbnailImageView.scaleType = ImageView.ScaleType.FIT_CENTER
             thumbnailImageView.setImageDrawable(null)
-            Log.d(TAG, "🖼️ No thumbnail URL — showing black placeholder")
         }
 
         feedPlayer.bindFromPool(playerPool, video.id, video.videoUrl)
@@ -115,47 +159,36 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
     }
 
     fun showVideoPlaying() {
-        Log.d(TAG, "🎬 Video playing requested - thumbnail will hide when video actually starts")
-        // The actual thumbnail hiding is now handled by the video start callback
-        // This method is kept for compatibility but the real work is done in the callback
+        // thumbnail hide handled by onVideoStarted callback
     }
 
     fun showThumbnail() {
-        Log.d(TAG, "🖼️ Showing thumbnail (video paused) - current visibility: ${thumbnailImageView.visibility}, alpha: ${thumbnailImageView.alpha}")
-
-        // Cancel any pending hide thumbnail task
-        hideThumbnailRunnable?.let {
-            hideThumbnailHandler?.removeCallbacks(it)
-            Log.d(TAG, "❌ Cancelled pending thumbnail hide task")
-        }
+        hideThumbnailRunnable?.let { hideThumbnailHandler?.removeCallbacks(it) }
         hideThumbnailRunnable = null
-
-        // Show thumbnail immediately when video is paused
         thumbnailImageView.clearAnimation()
         thumbnailImageView.alpha = 1f
         thumbnailImageView.visibility = View.VISIBLE
-
-        Log.d(TAG, "✅ Thumbnail now visible - final visibility: ${thumbnailImageView.visibility}, alpha: ${thumbnailImageView.alpha}")
+        startLoading()
     }
 
     fun hideThumbnailImmediately() {
-        Log.d(TAG, "🚫 Hiding thumbnail immediately")
-
-        // Cancel any pending hide thumbnail task
         hideThumbnailRunnable?.let { hideThumbnailHandler?.removeCallbacks(it) }
         hideThumbnailRunnable = null
-
-        // Hide thumbnail immediately
         thumbnailImageView.clearAnimation()
         thumbnailImageView.visibility = View.GONE
-        thumbnailImageView.alpha = 1f // Reset for next use
+        thumbnailImageView.alpha = 1f
+        stopLoading()
+    }
 
-        Log.d(TAG, "✅ Thumbnail hidden immediately")
+    private fun startLoading() {
+        loadingIndicator.visibility = View.VISIBLE
+    }
+
+    private fun stopLoading() {
+        loadingIndicator.visibility = View.GONE
     }
 
     fun prepareForReuse(playerPool: VideoFeedPlayerPool) {
-        Log.d(TAG, "🔄 Preparing for reuse")
-
         hideThumbnailRunnable?.let { hideThumbnailHandler?.removeCallbacks(it) }
         hideThumbnailRunnable = null
 
@@ -169,10 +202,10 @@ class VideoFeedCell(context: Context) : RecyclerView.ViewHolder(
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailImageView.alpha = 1f
         thumbnailImageView.clearAnimation()
+        stopLoading()
+        indexLabel.text = ""
 
         Glide.with(container.context).clear(thumbnailImageView)
-
-        Log.d(TAG, "✅ Cell detached — player kept in pool")
     }
 
     fun cleanup() {

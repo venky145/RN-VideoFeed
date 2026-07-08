@@ -12,7 +12,7 @@ native `UICollectionView` / `RecyclerView` so scrolling stays smooth even with m
 - Full-page vertical paging feed (snap-to-page)
 - Seamless resume — scrolling back continues **where you left off** instead of restarting
 - Warm player pool (keeps ~8 videos ready) for instant playback on both platforms
-- Thumbnail placeholder shown until the video is actually ready
+- Thumbnail + loading spinner until the video is ready; position label on each cell
 - Tap to play/pause, auto-pause on scroll and when the app backgrounds
 - Pagination hook (`onEndReached`) and per-video change events
 
@@ -21,35 +21,42 @@ native `UICollectionView` / `RecyclerView` so scrolling stays smooth even with m
 | Path | Description |
 |------|-------------|
 | `rn-videofeed/` | The library — iOS (Swift/ObjC), Android (Kotlin), and the JS/TS API |
-| `VideoFeedSample/` | React Native 0.77 sample app that consumes the library via `file:../rn-videofeed` |
+| `VideoFeedSample/` | **The** sample app (RN 0.77) — links the library via `file:../rn-videofeed` |
+
+There is only one sample in this repo so setup stays obvious. Real apps should install
+from npm (`npm install rn-videofeed`) and use the same API as `VideoFeedSample`.
 
 ## Requirements
 
 - React Native >= 0.76
 - iOS 16.0+
 - Android — **Old Architecture** (`newArchEnabled=false`); the component is a legacy `SimpleViewManager`
+- iOS — prefer Old Architecture for this view (`RCT_NEW_ARCH_ENABLED=0` when running `pod install`)
 
 ## Installation
 
-The library is currently distributed via git / local path (not yet on npm).
-
-```json
-// package.json
-{
-  "dependencies": {
-    "rn-videofeed": "github:venky145/RN-VideoFeed#main"
-  }
-}
+```bash
+npm install rn-videofeed
 ```
 
 Then:
 
 ```bash
 # iOS
-cd ios && pod install
+cd ios && RCT_NEW_ARCH_ENABLED=0 pod install
 
 # Android — ensure Old Architecture in android/gradle.properties
 # newArchEnabled=false
+```
+
+You can also pin from GitHub if needed:
+
+```json
+{
+  "dependencies": {
+    "rn-videofeed": "github:venky145/RN-VideoFeed#main"
+  }
+}
 ```
 
 ## Usage
@@ -134,14 +141,17 @@ type FeedPlayerNativeProps = {
 
 ## Running the sample
 
+`VideoFeedSample` is the only demo app. It uses the local library so you can change
+native / JS code and see it immediately.
+
 ```bash
 cd VideoFeedSample
 npm install
-cd ios && pod install && cd ..
+cd ios && RCT_NEW_ARCH_ENABLED=0 pod install && cd ..
 
 npm start                 # Metro
 npm run ios               # iOS
-npm run android           # Android
+npm run android           # Android  (newArchEnabled=false)
 ```
 
 ## License

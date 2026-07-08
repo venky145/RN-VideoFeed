@@ -12,6 +12,7 @@ class VideoFeedView: UIView {
   private var collectionView: UICollectionView!
   private var videos: [VideoData] = []
   private var currentPlayer: AVPlayer?
+  private let playerPool = VideoFeedPlayerPool(maxSize: 8)
   private var preloadTasks: [String: AVAsset] = [:]
   private var feedIsActive = true
   private var shouldPlayFirstVideo = false
@@ -81,6 +82,7 @@ class VideoFeedView: UIView {
     collectionView.dataSource = self
     collectionView.delegate = self
     collectionView.prefetchDataSource = self
+    collectionView.isPrefetchingEnabled = true
 
     addSubview(collectionView)
     collectionView.translatesAutoresizingMaskIntoConstraints = false
@@ -96,16 +98,21 @@ class VideoFeedView: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
 
-    // Update layout - use full screen bounds, not collectionView bounds which might include safe area
     if let layout = collectionView.collectionViewLayout
-        as? UICollectionViewFlowLayout
+      as? UICollectionViewFlowLayout
     {
-      // Use bounds.size to ensure full screen, accounting for any parent container constraints
-      let fullScreenSize = CGSize(
-        width: bounds.width,
-        height: bounds.height
-      )
-      layout.itemSize = fullScreenSize
+      let fullScreenSize = CGSize(width: bounds.width, height: bounds.height)
+      if layout.itemSize != fullScreenSize {
+        layout.itemSize = fullScreenSize
+        layout.invalidateLayout()
+      }
+    }
+  }
+
+  override func willMove(toWindow newWindow: UIWindow?) {
+    super.willMove(toWindow: newWindow)
+    if newWindow == nil {
+      playerPool.releaseAll()
     }
   }
 
@@ -217,15 +224,38 @@ class VideoFeedView: UIView {
   }
 
   private func getCurrentIndex() -> Int {
-    let offset = collectionView.contentOffset.y
-    let height = collectionView.bounds.height
-
-    guard height > 0 else {
-      print("Warning: CollectionView height is 0")
-      return 0  // or some default/fallback index
+    let visibleRect = CGRect(
+      x: collectionView.contentOffset.x,
+      y: collectionView.contentOffset.y,
+      width: collectionView.bounds.width,
+      height: collectionView.bounds.height
+    )
+    let center = CGPoint(x: visibleRect.midX, y: visibleRect.midY)
+    if let indexPath = collectionView.indexPathForItem(at: center) {
+      return indexPath.item
     }
 
-    return max(0, Int(round(offset / height)))
+    let height = collectionView.bounds.height
+    guard height > 0 else { return 0 }
+    let index = Int(round(collectionView.contentOffset.y / height))
+    return max(0, min(videos.count - 1, index))
+  }
+
+  private func handleScrollEnd() {
+    let index = getCurrentIndex()
+    for cell in collectionView.visibleCells as! [VideoFeedCell] {
+      cell.feedPlayer.isVisible = false
+    }
+
+    // Reset manual pause state for new video
+    isManuallyPaused = false
+
+    playVideo(at: index)
+
+    if index < videos.count {
+      let videoId = videos[index].id
+      eventEmitter?.sendEvent("onVideoChange", body: ["videoId": videoId])
+    }
   }
 
   private func playVideo(at index: Int) {
@@ -236,33 +266,80 @@ class VideoFeedView: UIView {
       return
     }
 
-    guard index < videos.count else {
+    guard index >= 0, index < videos.count else {
       print("Index out of bounds:", index)
       return
     }
+
     currentPlayer?.pause()
+
     if let cell = collectionView.cellForItem(
       at: IndexPath(item: index, section: 0)) as? VideoFeedCell
     {
-      print("Found cell for index:", index)
-      currentPlayer = cell.feedPlayer.player
-      currentPlayer?.isMuted = false
-      
-      // Only play if not manually paused
-      if !isManuallyPaused {
-        currentPlayer?.play()
-        cell.feedPlayer.isVisible = true
-        // Don't hide thumbnail here - it will be hidden when video actually starts playing via callback
-        print("▶️ Auto-playing new video at index: \(index)")
-      } else {
-        cell.feedPlayer.isVisible = false
-        print("⏸️ New video at index: \(index) but staying paused (manually paused)")
-      }
-      
-      onVideoChange?(videos[index].id)
+      setupVideoForPlayback(cell, at: index)
     } else {
-      print("No cell found for index:", index)
+      print("No cell found for index: \(index), scheduling retry...")
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        self?.playVideoWithRetry(at: index, retriesLeft: 8)
+      }
     }
+  }
+
+  private func playVideoWithRetry(at index: Int, retriesLeft: Int) {
+    guard feedIsActive, index >= 0, index < videos.count else {
+      return
+    }
+
+    if let cell = collectionView.cellForItem(
+      at: IndexPath(item: index, section: 0)) as? VideoFeedCell
+    {
+      print("Found cell for index \(index) after retry")
+      setupVideoForPlayback(cell, at: index)
+    } else if retriesLeft > 0 {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        self?.playVideoWithRetry(at: index, retriesLeft: retriesLeft - 1)
+      }
+    } else {
+      print("❌ Failed to find cell for index \(index) after retries")
+    }
+  }
+
+  private func setupVideoForPlayback(_ cell: VideoFeedCell, at index: Int) {
+    let video = videos[index]
+    print("Found cell for index:", index)
+
+    if cell.feedPlayer.videoId != video.id || cell.feedPlayer.player == nil {
+      cell.configure(
+        with: video,
+        playerPool: playerPool,
+        index: index,
+        total: videos.count
+      )
+    }
+
+    let resuming = playerPool.hasPlayer(videoId: video.id, videoUrl: video.videoUrl)
+      && (playerPool.getPlaybackPosition(videoId: video.id) > 0.3
+        || cell.feedPlayer.hasPlaybackPosition())
+
+    if resuming {
+      cell.hideThumbnailImmediately()
+    } else {
+      cell.showThumbnail()
+    }
+
+    currentPlayer = cell.feedPlayer.player
+    currentPlayer?.isMuted = false
+
+    if !isManuallyPaused {
+      cell.feedPlayer.isVisible = true
+      currentPlayer?.play()
+      print("▶️ Auto-playing new video at index: \(index)")
+    } else {
+      cell.feedPlayer.isVisible = false
+      print("⏸️ New video at index: \(index) but staying paused (manually paused)")
+    }
+
+    onVideoChange?(video.id)
   }
 
   // MARK: - Tap Gesture Setup
@@ -356,6 +433,7 @@ class VideoFeedView: UIView {
   // Handle removing notificationcenter listners for app states
   deinit {
     NotificationCenter.default.removeObserver(self)
+    playerPool.releaseAll()
   }
 }
 
@@ -372,28 +450,45 @@ extension VideoFeedView: UICollectionViewDataSource {
     let cell =
     collectionView.dequeueReusableCell(
       withReuseIdentifier: "VideoFeedCell", for: indexPath) as! VideoFeedCell
+    cell.playerPool = playerPool
     let video = videos[indexPath.item]
-    cell.configure(with: video)
+    cell.configure(
+      with: video,
+      playerPool: playerPool,
+      index: indexPath.item,
+      total: videos.count
+    )
     return cell
+  }
+
+  func collectionView(
+    _ collectionView: UICollectionView,
+    didEndDisplaying cell: UICollectionViewCell,
+    forItemAt indexPath: IndexPath
+  ) {
+    guard let videoCell = cell as? VideoFeedCell else { return }
+    if !videoCell.feedPlayer.videoId.isEmpty {
+      playerPool.pause(videoId: videoCell.feedPlayer.videoId)
+    }
+    videoCell.feedPlayer.detachPlayer()
   }
 }
 
 extension VideoFeedView: UICollectionViewDelegate {
   func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-    let index = getCurrentIndex()
-    for cell in collectionView.visibleCells as! [VideoFeedCell] {
-      cell.feedPlayer.isVisible = false
-    }
-    
-    // Reset manual pause state for new video
-    isManuallyPaused = false
-    
-    playVideo(at: index)
-    
-    // Emit video change event to React Native
-    if index < videos.count {
-      let videoId = videos[index].id
-      eventEmitter?.sendEvent("onVideoChange", body: ["videoId": videoId])
+    handleScrollEnd()
+  }
+
+  func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+    handleScrollEnd()
+  }
+
+  func scrollViewDidEndDragging(
+    _ scrollView: UIScrollView, willDecelerate decelerate: Bool
+  ) {
+    // Slow drags that snap without momentum never call didEndDecelerating.
+    if !decelerate {
+      handleScrollEnd()
     }
   }
   

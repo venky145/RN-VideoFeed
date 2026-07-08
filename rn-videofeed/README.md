@@ -6,8 +6,9 @@ native `UICollectionView` / `RecyclerView` for smooth scrolling with many videos
 
 - Full-page vertical paging (snap-to-page)
 - Seamless resume — scrolling back continues **where you left off** instead of restarting
-- Warm player pool (keeps ~8 videos ready) for instant playback
-- Thumbnail placeholder until the video is ready; tap to play/pause; auto-pause on scroll/background
+- Warm player pool (keeps ~8 videos ready) on **iOS and Android**
+- Thumbnail + loading spinner until ready; position label on each cell
+- Tap to play/pause; auto-pause on scroll/background
 - Pagination hook (`onEndReached`) and per-video change events
 
 ## Requirements
@@ -15,16 +16,20 @@ native `UICollectionView` / `RecyclerView` for smooth scrolling with many videos
 - React Native >= 0.76
 - iOS 16.0+
 - Android — **Old Architecture** (`newArchEnabled=false`); the component is a legacy `SimpleViewManager`
+- iOS — prefer Old Architecture (`RCT_NEW_ARCH_ENABLED=0` for `pod install`)
 
 ## Install
 
 ```bash
 npm install rn-videofeed
 # iOS
-cd ios && pod install
+cd ios && RCT_NEW_ARCH_ENABLED=0 pod install
 ```
 
 Ensure `android/gradle.properties` has `newArchEnabled=false`.
+
+For a full runnable example, clone the repo and open **`VideoFeedSample/`**
+(linked to the library via `file:../rn-videofeed`).
 
 ## Usage
 

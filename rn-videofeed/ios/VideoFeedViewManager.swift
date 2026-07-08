@@ -37,35 +37,36 @@ class VideoFeedViewManager: RCTViewManager {
     return true
   }
 
-  // Common function to safely access VideoFeedView using the working approach
-  private func withVideoFeedView(_ reactTag: NSNumber, operation: String, action: @escaping (VideoFeedView) -> Void) {
-    
-    // Add a small delay to ensure view is properly registered
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-      guard let uiManager = self?.bridge?.uiManager else {
-        return
-      }
-      
-      // Use the modern approach for New Architecture
-      uiManager.addUIBlock { _, viewRegistry in
-        
-        // Try to get the view from the registry
-        if let view = viewRegistry?[reactTag] as? VideoFeedView {
-          action(view)
-        } else {
-          
-          // Alternative approach: try to get view directly
-          if let directView = uiManager.view(forReactTag: reactTag) as? VideoFeedView {
-            action(directView)
-          } else {
-            
-            // Last resort: try to enumerate all views
-            for (tag, view) in viewRegistry ?? [:] {
-              if let videoView = view as? VideoFeedView {
-              }
-            }
-          }
+  // Safely resolve the VideoFeedView for a reactTag on both the legacy and new
+  // architectures. The view registry lookup runs inside `addUIBlock`, which is
+  // the only queue-safe way to read it. If the view is not yet registered
+  // (command dispatched before mount completes) we retry a few times instead of
+  // calling `uiManager.view(forReactTag:)`, which asserts it must run on the
+  // UIManager queue and would crash when invoked from the UI block.
+  private func withVideoFeedView(
+    _ reactTag: NSNumber,
+    operation: String,
+    retriesLeft: Int = 40,
+    action: @escaping (VideoFeedView) -> Void
+  ) {
+    guard let uiManager = bridge?.uiManager else {
+      return
+    }
+
+    uiManager.addUIBlock { [weak self] _, viewRegistry in
+      if let view = viewRegistry?[reactTag] as? VideoFeedView {
+        action(view)
+      } else if retriesLeft > 0 {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+          self?.withVideoFeedView(
+            reactTag,
+            operation: operation,
+            retriesLeft: retriesLeft - 1,
+            action: action
+          )
         }
+      } else {
+        print("⚠️ VideoFeedView not found for tag \(reactTag) during \(operation)")
       }
     }
   }
