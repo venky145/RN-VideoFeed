@@ -157,6 +157,12 @@ class FeedPlayer: UIView {
       }
       if player?.timeControlStatus == .playing {
         onVideoStartedPlaying?()
+      } else if isVisible {
+        // Item became ready after attach; status KVO won't fire again.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+          guard let self = self, self.player?.timeControlStatus == .playing else { return }
+          self.onVideoStartedPlaying?()
+        }
       }
     case .failed:
       if let error = item.error {

@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-07-09
+
+### Fixed
+- **Android**: crash on feed load (`No suitable media source factory`) — set explicit
+  MIME types for MP4/HLS URLs in `VideoFeedPlayerPool`.
+- **Android**: added Media3 HLS module dependency for `.m3u8` streams.
+- **iOS**: playback not restarting after app relaunch / `reloadData` — trigger
+  `playVideo` explicitly after `setVideos` and wire playback UI callbacks reliably.
+
+### Changed
+- **VideoFeedSample**: platform-specific demo URLs (Apple HLS on iOS, MP4 on Android)
+  and re-push videos on `AppState` active.
+
 ## [0.1.1] - 2026-07-08
 
 ### Added
@@ -41,5 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VideoFeedSample` React Native 0.77 example app.
 - GitHub Actions CI (typecheck, lint, Android library build).
 
+[0.1.2]: https://github.com/venky145/RN-VideoFeed/releases/tag/v0.1.2
 [0.1.1]: https://github.com/venky145/RN-VideoFeed/releases/tag/v0.1.1
 [0.1.0]: https://github.com/venky145/RN-VideoFeed/releases/tag/v0.1.0

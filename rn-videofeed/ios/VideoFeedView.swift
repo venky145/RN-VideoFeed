@@ -137,10 +137,14 @@ class VideoFeedView: UIView {
     collectionView.reloadData()
     preloadNextVideos()
 
-    // Set flag to play first video when cell becomes available
+    // willDisplay may not run for already-visible cells after reloadData (e.g. app relaunch).
     if !videos.isEmpty {
       shouldPlayFirstVideo = true
-      print("Set shouldPlayFirstVideo flag to true")
+      DispatchQueue.main.async { [weak self] in
+        guard let self = self, !self.videos.isEmpty else { return }
+        self.shouldPlayFirstVideo = false
+        self.playVideo(at: self.getCurrentIndex())
+      }
     }
   }
 
@@ -317,6 +321,10 @@ class VideoFeedView: UIView {
       )
     }
 
+    cell.feedPlayer.onVideoStartedPlaying = { [weak cell] in
+      cell?.showVideoPlaying()
+    }
+
     let resuming = playerPool.hasPlayer(videoId: video.id, videoUrl: video.videoUrl)
       && (playerPool.getPlaybackPosition(videoId: video.id) > 0.3
         || cell.feedPlayer.hasPlaybackPosition())
@@ -333,6 +341,7 @@ class VideoFeedView: UIView {
     if !isManuallyPaused {
       cell.feedPlayer.isVisible = true
       currentPlayer?.play()
+      syncPlaybackUI(for: cell)
       print("▶️ Auto-playing new video at index: \(index)")
     } else {
       cell.feedPlayer.isVisible = false
@@ -340,6 +349,22 @@ class VideoFeedView: UIView {
     }
 
     onVideoChange?(video.id)
+  }
+
+  private func syncPlaybackUI(for cell: VideoFeedCell) {
+    guard let player = cell.feedPlayer.player else { return }
+    if player.timeControlStatus == .playing {
+      cell.showVideoPlaying()
+      return
+    }
+    if player.currentItem?.status == .readyToPlay {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak cell] in
+        guard let cell = cell else { return }
+        if cell.feedPlayer.player?.timeControlStatus == .playing {
+          cell.showVideoPlaying()
+        }
+      }
+    }
   }
 
   // MARK: - Tap Gesture Setup

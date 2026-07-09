@@ -1,6 +1,6 @@
 {
   "name": "rn-videofeed",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native vertical full-screen video feed for React Native (Reels/TikTok style) with seamless resume.",
   "main": "src/index.ts",
   "types": "index.d.ts",

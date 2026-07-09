@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 
@@ -45,7 +46,17 @@ class VideoFeedPlayerPool(
             repeatMode = Player.REPEAT_MODE_ONE
             volume = 1.0f
         }
-        player.setMediaItem(MediaItem.fromUri(Uri.parse(videoUrl)))
+        val uri = Uri.parse(videoUrl)
+        val mimeType = when {
+            videoUrl.endsWith(".m3u8", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
+            videoUrl.endsWith(".mp4", ignoreCase = true) -> MimeTypes.VIDEO_MP4
+            else -> null
+        }
+        val mediaItem = MediaItem.Builder()
+            .setUri(uri)
+            .apply { if (mimeType != null) setMimeType(mimeType) }
+            .build()
+        player.setMediaItem(mediaItem)
         player.prepare()
 
         entries[videoId] = PooledEntry(player, videoUrl)

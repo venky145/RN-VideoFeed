@@ -5,7 +5,9 @@
 
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  AppState,
   findNodeHandle,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -17,7 +19,37 @@ import VideoFeedView, {
   VideoFeedEmitter,
 } from 'rn-videofeed';
 
-const SAMPLE_VIDEOS = [
+const IOS_HLS_VIDEOS = [
+  {
+    id: 'bipbop-1',
+    title: 'Apple HLS (gear1)',
+    videoUrl:
+      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/gear1/prog_index.m3u8',
+    thumbnailUrl: '',
+    viewCount: 1200,
+  },
+  {
+    id: 'bipbop-2',
+    title: 'Apple HLS (gear2)',
+    videoUrl:
+      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/gear2/prog_index.m3u8',
+    thumbnailUrl: '',
+    viewCount: 500,
+  },
+  {
+    id: 'bipbop-3',
+    title: 'Apple HLS (gear3)',
+    videoUrl:
+      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/gear3/prog_index.m3u8',
+    thumbnailUrl: '',
+    viewCount: 900,
+  },
+];
+
+// Android build currently only bundles the core ExoPlayer module. HLS playback
+// requires adding the Media3 HLS extension; until then, use MP4 sources on
+// Android so the sample runs out-of-the-box.
+const ANDROID_MP4_VIDEOS = [
   {
     id: 'bunny',
     title: 'Big Buck Bunny',
@@ -46,6 +78,8 @@ const SAMPLE_VIDEOS = [
     viewCount: 900,
   },
 ];
+
+const SAMPLE_VIDEOS = Platform.OS === 'android' ? ANDROID_MP4_VIDEOS : IOS_HLS_VIDEOS;
 
 function App(): React.JSX.Element {
   const {width, height} = useWindowDimensions();
@@ -79,9 +113,9 @@ function App(): React.JSX.Element {
     let cancelled = false;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const loadVideos = () => {
+    const pushVideos = () => {
       if (cancelled) {
-        return;
+        return false;
       }
       const handle =
         feedRef.current != null
@@ -91,14 +125,29 @@ function App(): React.JSX.Element {
           : null;
       if (handle != null) {
         VideoFeedManagerNative.setVideos(handle, SAMPLE_VIDEOS);
-      } else {
+        VideoFeedManagerNative.setFeedActive(handle, true);
+        return true;
+      }
+      return false;
+    };
+
+    const loadVideos = () => {
+      if (!pushVideos()) {
         retryTimeout = setTimeout(loadVideos, 100);
       }
     };
 
     retryTimeout = setTimeout(loadVideos, 500);
+
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        pushVideos();
+      }
+    });
+
     return () => {
       cancelled = true;
+      appStateSub.remove();
       if (retryTimeout != null) {
         clearTimeout(retryTimeout);
       }
