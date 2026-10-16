@@ -7,6 +7,13 @@ A native, vertical full-screen video feed for React Native — Reels / TikTok / 
 Playback is powered by **AVPlayer** on iOS and **Media3 ExoPlayer** on Android, driven by a
 native `UICollectionView` / `RecyclerView` so scrolling stays smooth even with many videos.
 
+## Demo
+
+Screen recording of `VideoFeedSample` on device (vertical swipe feed):
+
+- [Watch / download videofeed-demo.mp4](https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo.mp4)
+- [Release notes](https://github.com/venky145/RN-VideoFeed/releases/tag/demo-2026-10-16)
+
 ## Features
 
 - Full-page vertical paging feed (snap-to-page)
