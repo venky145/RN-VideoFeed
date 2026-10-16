@@ -5,6 +5,11 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# Paper UIManager + findNodeHandle is required for rn-videofeed's imperative
+# setVideos/appendVideos commands. Fabric tags are not in the Paper registry,
+# which left the sample with an empty black feed ("VideoFeedView not found").
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+
 # RNVideoFeed.podspec requires iOS 16+; keep app platform in sync.
 platform :ios, '16.0'
 prepare_react_native_project!
@@ -35,5 +40,39 @@ target 'VideoFeedSample' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Xcode 26+ only supports deployment targets >= 15.0; some transitive
+    # pods still ship with 9.0/11.0 and trigger build warnings/errors.
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if current.nil? || current.to_f < 16.0
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+        end
+
+        # Xcode 26+/Apple Clang rejects fmt 11 consteval; compile fmt as C++17
+        # so FMT_USE_CONSTEVAL stays off. Leave other pods on C++20.
+        if target.name == 'fmt'
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+      end
+    end
+
+    # fmt 11.0.2 redefines FMT_USE_CONSTEVAL from compiler detection (no
+    # #ifndef guard), so -D flags are overwritten. Patch base.h so all Apple
+    # Clang builds disable consteval (required for Xcode 26+).
+    fmt_base = File.join(installer.sandbox.root, 'fmt/include/fmt/base.h')
+    if File.exist?(fmt_base)
+      contents = File.read(fmt_base)
+      patched = contents.gsub(
+        /#elif defined\(__apple_build_version__\) && __apple_build_version__ < 14000029L\n#  define FMT_USE_CONSTEVAL 0  \/\/ consteval is broken in Apple clang < 14\./,
+        "#elif defined(__apple_build_version__)\n#  define FMT_USE_CONSTEVAL 0  // consteval is broken in Apple clang (Xcode 26+)."
+      )
+      if patched != contents
+        File.chmod(0644, fmt_base)
+        File.write(fmt_base, patched)
+        Pod::UI.puts 'Patched fmt/base.h for Xcode 26+ consteval workaround'.green
+      end
+    end
   end
 end

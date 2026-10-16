@@ -5,7 +5,7 @@ set -euo pipefail
 # react-native-community/directory. Requires: gh auth login
 
 ENTRY='{
-    "githubUrl": "https://github.com/venky145/RN-VideoFeed",
+    "githubUrl": "https://github.com/venky145/RN-VideoFeed/tree/main/rn-videofeed",
     "npmPkg": "rn-videofeed",
     "examples": [
       "https://github.com/venky145/RN-VideoFeed/tree/main/VideoFeedSample"
@@ -14,17 +14,18 @@ ENTRY='{
     "android": true
   }'
 
-WORKDIR=$(mktemp -d)
-trap 'rm -rf "$WORKDIR"' EXIT
-
 if ! gh auth status >/dev/null 2>&1; then
   echo "GitHub CLI not logged in. Run: gh auth login -h github.com -p ssh -w"
   exit 1
 fi
 
-echo "Forking react-native-community/directory (if needed)..."
-gh repo fork react-native-community/directory --clone --remote=true -- "$WORKDIR"
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
 cd "$WORKDIR"
+
+echo "Forking react-native-community/directory (if needed)..."
+gh repo fork react-native-community/directory --clone
+cd directory
 
 git checkout -b add-rn-videofeed
 
@@ -51,10 +52,13 @@ Native vertical video feed (Reels/TikTok style) for iOS and Android.
 EOF
 )"
 
-git push -u origin add-rn-videofeed
+GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -i $HOME/.ssh/id_ed25519_venky145 -o IdentitiesOnly=yes}" \
+  git push -u origin add-rn-videofeed
 
 gh pr create \
   --repo react-native-community/directory \
+  --head venky145:add-rn-videofeed \
+  --base main \
   --title "Add rn-videofeed" \
   --body "$(cat <<'EOF'
 Adds **rn-videofeed** — native vertical full-screen video feed for React Native (Reels/TikTok style).

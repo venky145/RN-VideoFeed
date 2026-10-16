@@ -98,13 +98,24 @@ class VideoFeedView: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
 
+    guard bounds.width > 1, bounds.height > 1 else { return }
+
     if let layout = collectionView.collectionViewLayout
       as? UICollectionViewFlowLayout
     {
       let fullScreenSize = CGSize(width: bounds.width, height: bounds.height)
       if layout.itemSize != fullScreenSize {
+        let wasZero = layout.itemSize.width < 1 || layout.itemSize.height < 1
         layout.itemSize = fullScreenSize
         layout.invalidateLayout()
+        // First real size after a Fabric 0×0 collapse — reload so cells appear.
+        if wasZero, !videos.isEmpty {
+          collectionView.reloadData()
+          DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.playVideo(at: self.getCurrentIndex())
+          }
+        }
       }
     }
   }
