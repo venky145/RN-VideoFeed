@@ -6,11 +6,9 @@ native `UICollectionView` / `RecyclerView` for smooth scrolling with many videos
 
 ## Demo
 
-Device screen recording (vertical swipe feed):
+![VideoFeedSample demo](https://raw.githubusercontent.com/venky145/RN-VideoFeed/main/docs/videofeed-demo.gif)
 
-https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo.mp4
-
-[Download MP4](https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo.mp4) · [Full repo README](https://github.com/venky145/RN-VideoFeed#demo)
+[Full MP4 download](https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo-gh.mp4) · [Repo demo](https://github.com/venky145/RN-VideoFeed#demo)
 
 - Full-page vertical paging (snap-to-page)
 - Seamless resume — scrolling back continues **where you left off** instead of restarting
