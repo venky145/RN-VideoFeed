@@ -9,11 +9,13 @@ native `UICollectionView` / `RecyclerView` so scrolling stays smooth even with m
 
 ## Demo
 
-Screen recording of `VideoFeedSample` on device (vertical swipe feed):
+`VideoFeedSample` on device (vertical swipe feed):
 
-![VideoFeedSample demo](docs/videofeed-demo.gif)
+| iOS | Android |
+|:---:|:-------:|
+| ![iOS demo](docs/videofeed-demo.gif) | ![Android demo](docs/videofeed-demo-android.gif) |
 
-[Full MP4 download](https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo-gh.mp4) · [Release](https://github.com/venky145/RN-VideoFeed/releases/tag/demo-2026-10-16)
+[iOS MP4](https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo-gh.mp4) · [Android MP4](https://github.com/venky145/RN-VideoFeed/releases/download/demo-2026-10-16/videofeed-demo-android.mp4) · [Release](https://github.com/venky145/RN-VideoFeed/releases/tag/demo-2026-10-16)
 
 ## Features
 
